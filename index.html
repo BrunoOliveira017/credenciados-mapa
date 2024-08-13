@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar Credenciado</title>
+</head>
+<body>
+    <input type="text" id="cityInput" placeholder="Digite o nome da cidade">
+    <button onclick="findNearestCredenciado()">Buscar Credenciado</button>
+    <div id="result"></div>
+
+    <script>
+    function findNearestCredenciado() {
+        var city = document.getElementById("cityInput").value;
+        var apiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
+
+        fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${city}&key=${apiKey}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.results.length > 0) {
+                    var location = data.results[0].geometry.location;
+                    findClosest(location.lat, location.lng);
+                } else {
+                    document.getElementById("result").innerHTML = "Cidade não encontrada.";
+                }
+            })
+            .catch(error => console.error("Erro ao obter coordenadas:", error));
+    }
+
+    function findClosest(lat, lng) {
+        var closestCity = "São Paulo";  // Exemplo de cidade mais próxima
+        var distance = 20;  // Exemplo de distância
+
+        document.getElementById("result").innerHTML = `O credenciado mais próximo está em ${closestCity}, a ${distance} km de distância.`;
+    }
+    </script>
+</body>
+</html>
