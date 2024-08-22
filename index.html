@@ -3,14 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pesquisa de Cidades</title>
+    <title>Pesquisa de Cidades com Autocompletar</title>
+    <style>
+        #sugestoes {
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 300px;
+            margin-top: 5px;
+            position: absolute;
+            background-color: #fff;
+            z-index: 1000;
+        }
+
+        #sugestoes div {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        #sugestoes div:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
 </head>
 <body>
     <div style="padding: 20px;">
-        <!-- Campo de Entrada para Pesquisa de Cidades -->
-        <input type="text" id="cidadeInput" placeholder="Digite o nome da cidade" style="width: 300px; padding: 5px; margin-bottom: 10px;"/>
+        <input type="text" id="cidadeInput" placeholder="Digite o nome da cidade" style="width: 300px; padding: 5px; margin-bottom: 10px;" onkeyup="sugerirCidades()"/>
+        <div id="sugestoes"></div>
 
-        <!-- Filtros Opcionais -->
         <div style="margin-top: 10px;">
             <label>
                 <input type="checkbox" id="oficinaMovelCheckbox"/> Oficina Móvel?
@@ -21,34 +41,58 @@
             </label>
         </div>
 
-        <!-- Botão de Pesquisa -->
         <button style="margin-top: 20px;" onclick="pesquisarCidade()">Pesquisar</button>
 
-        <!-- Exibição do Resultado -->
         <div id="resultado" style="margin-top: 20px; font-weight: bold;"></div>
     </div>
 
     <script>
+    function sugerirCidades() {
+        var input = document.getElementById('cidadeInput').value;
+
+        if (input.length < 2) {
+            document.getElementById('sugestoes').innerHTML = '';
+            return;
+        }
+
+        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=5`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                var sugestoesDiv = document.getElementById('sugestoes');
+                sugestoesDiv.innerHTML = '';
+
+                data.forEach(item => {
+                    var cidadeNome = item.display_name;
+                    var div = document.createElement('div');
+                    div.textContent = cidadeNome;
+                    div.onclick = function() {
+                        document.getElementById('cidadeInput').value = cidadeNome;
+                        sugestoesDiv.innerHTML = '';
+                    };
+                    sugestoesDiv.appendChild(div);
+                });
+            })
+            .catch(error => console.error('Erro ao sugerir cidades:', error));
+    }
+
     function pesquisarCidade() {
         var cidadePesquisada = document.getElementById('cidadeInput').value;
         var oficinaMovel = document.getElementById('oficinaMovelCheckbox').checked;
         var jaPrestouServico = document.getElementById('jaPrestouServicoCheckbox').checked;
 
-        // Verifica se o campo de pesquisa está vazio
         if (!cidadePesquisada) {
             document.getElementById('resultado').innerText = "Por favor, insira o nome de uma cidade.";
             return;
         }
 
-        // Obtém as coordenadas da cidade pesquisada
         obterCoordenadasCidade(cidadePesquisada, function(cidadePesquisadaLat, cidadePesquisadaLng) {
-            // Verifica se as coordenadas foram obtidas com sucesso
             if (cidadePesquisadaLat == null || cidadePesquisadaLng == null) {
                 document.getElementById('resultado').innerText = "Cidade não encontrada. Tente novamente.";
                 return;
             }
 
-            // Monta a consulta SQL para encontrar a cidade mais próxima no banco de dados
             var query = `
                 SELECT City_Name, 
                 (6371 * acos(cos(radians(${cidadePesquisadaLat})) 
@@ -56,23 +100,19 @@
                 * cos(radians(City_Lng) - radians(${cidadePesquisadaLng})) 
                 + sin(radians(${cidadePesquisadaLat})) 
                 * sin(radians(City_Lat)))) AS distance 
-                FROM Cities 
+                FROM "Tabela Instaladores"
                 WHERE 1=1`;
 
-            // Aplica o filtro "Oficina Móvel?" se selecionado
             if (oficinaMovel) {
-                query += " AND \`oficina movel?\` = true";
+                query += ` AND "Oficina Móvel" = true`;
             }
 
-            // Aplica o filtro "Já Prestou Serviço?" se selecionado
             if (jaPrestouServico) {
-                query += " AND \`Já prestou serviço?\` = true";
+                query += ` AND "Já prestou serviço" = true`;
             }
 
-            // Ordena pelo menor valor de distância e limita o resultado a 1 cidade
             query += " ORDER BY distance ASC LIMIT 1";
 
-            // Executa a consulta SQL no Zoho Analytics
             zohoAnalytics.executeSQL(query, function(response) {
                 if (response && response.length > 0) {
                     var cidadeMaisProxima = response[0]["City_Name"];
@@ -85,7 +125,6 @@
         });
     }
 
-    // Função para obter as coordenadas da cidade usando a API Nominatim
     function obterCoordenadasCidade(nomeCidade, callback) {
         var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeCidade)}&format=json&limit=1`;
 
