@@ -24,9 +24,13 @@
         #sugestoes div:hover {
             background-color: #f0f0f0;
         }
+
+        #resultado {
+            color: #ffffff; /* Cor branca para os avisos */
+        }
     </style>
 </head>
-<body>
+<body style="background-color: #1e1e1e; color: #ffffff;"> <!-- Tema escuro -->
     <div style="padding: 20px;">
         <input type="text" id="cidadeInput" placeholder="Digite o nome da cidade" style="width: 300px; padding: 5px; margin-bottom: 10px;" onkeyup="sugerirCidades()"/>
         <div id="sugestoes"></div>
@@ -55,7 +59,7 @@
             return;
         }
 
-        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=5`;
+        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=5&city=1&extratags=1`;
 
         fetch(url)
             .then(response => response.json())
@@ -64,14 +68,16 @@
                 sugestoesDiv.innerHTML = '';
 
                 data.forEach(item => {
-                    var cidadeNome = item.display_name;
-                    var div = document.createElement('div');
-                    div.textContent = cidadeNome;
-                    div.onclick = function() {
-                        document.getElementById('cidadeInput').value = cidadeNome;
-                        sugestoesDiv.innerHTML = '';
-                    };
-                    sugestoesDiv.appendChild(div);
+                    if (item.type === 'city' || item.type === 'town' || item.type === 'village') {
+                        var cidadeNome = item.display_name;
+                        var div = document.createElement('div');
+                        div.textContent = cidadeNome;
+                        div.onclick = function() {
+                            document.getElementById('cidadeInput').value = cidadeNome;
+                            sugestoesDiv.innerHTML = '';
+                        };
+                        sugestoesDiv.appendChild(div);
+                    }
                 });
             })
             .catch(error => console.error('Erro ao sugerir cidades:', error));
@@ -93,7 +99,6 @@
                 return;
             }
 
-            // Consulta para obter as cidades da tabela e seus nomes
             var query = `
                 SELECT "Cidade"
                 FROM "Tabela Instaladores"
@@ -112,10 +117,12 @@
                     var menorDistancia = Infinity;
                     var cidadeMaisProxima = '';
 
+                    var totalCities = response.length;
+                    var processedCities = 0;
+
                     response.forEach(function(row) {
                         var cidadeNome = row["Cidade"];
 
-                        // Obter as coordenadas da cidade do banco de dados
                         obterCoordenadasCidade(cidadeNome, function(lat, lng) {
                             if (lat != null && lng != null) {
                                 var distancia = calcularDistancia(cidadePesquisadaLat, cidadePesquisadaLng, lat, lng);
@@ -125,8 +132,15 @@
                                 }
                             }
 
-                            // Exibir o resultado
-                            document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${menorDistancia.toFixed(2)} km.`;
+                            processedCities++;
+
+                            if (processedCities === totalCities) {
+                                if (cidadeMaisProxima) {
+                                    document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${menorDistancia.toFixed(2)} km.`;
+                                } else {
+                                    document.getElementById('resultado').innerText = "Nenhuma cidade próxima encontrada.";
+                                }
+                            }
                         });
                     });
                 } else {
@@ -137,14 +151,18 @@
     }
 
     function obterCoordenadasCidade(nomeCidade, callback) {
-        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeCidade)}&format=json&limit=1`;
+        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeCidade)}&format=json&limit=1&addressdetails=1&extratags=1`;
 
         fetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data && data.length > 0) {
                     var location = data[0];
-                    callback(location.lat, location.lon);
+                    if (location.type === 'city' || location.type === 'town' || location.type === 'village') {
+                        callback(location.lat, location.lon);
+                    } else {
+                        callback(null, null);
+                    }
                 } else {
                     callback(null, null);
                 }
