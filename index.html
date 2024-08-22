@@ -93,13 +93,9 @@
                 return;
             }
 
+            // Consulta para obter as cidades da tabela e seus nomes
             var query = `
-                SELECT City_Name, 
-                (6371 * acos(cos(radians(${cidadePesquisadaLat})) 
-                * cos(radians(City_Lat)) 
-                * cos(radians(City_Lng) - radians(${cidadePesquisadaLng})) 
-                + sin(radians(${cidadePesquisadaLat})) 
-                * sin(radians(City_Lat)))) AS distance 
+                SELECT "Cidade"
                 FROM "Tabela Instaladores"
                 WHERE 1=1`;
 
@@ -111,15 +107,30 @@
                 query += ` AND "Já prestou serviço" = true`;
             }
 
-            query += " ORDER BY distance ASC LIMIT 1";
-
             zohoAnalytics.executeSQL(query, function(response) {
                 if (response && response.length > 0) {
-                    var cidadeMaisProxima = response[0]["City_Name"];
-                    var distancia = response[0]["distance"].toFixed(2);
-                    document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${distancia} km.`;
+                    var menorDistancia = Infinity;
+                    var cidadeMaisProxima = '';
+
+                    response.forEach(function(row) {
+                        var cidadeNome = row["Cidade"];
+
+                        // Obter as coordenadas da cidade do banco de dados
+                        obterCoordenadasCidade(cidadeNome, function(lat, lng) {
+                            if (lat != null && lng != null) {
+                                var distancia = calcularDistancia(cidadePesquisadaLat, cidadePesquisadaLng, lat, lng);
+                                if (distancia < menorDistancia) {
+                                    menorDistancia = distancia;
+                                    cidadeMaisProxima = cidadeNome;
+                                }
+                            }
+
+                            // Exibir o resultado
+                            document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${menorDistancia.toFixed(2)} km.`;
+                        });
+                    });
                 } else {
-                    document.getElementById('resultado').innerText = "Nenhuma cidade encontrada próxima.";
+                    document.getElementById('resultado').innerText = "Nenhuma cidade encontrada.";
                 }
             });
         });
@@ -142,6 +153,23 @@
                 console.error('Erro ao obter coordenadas:', error);
                 callback(null, null);
             });
+    }
+
+    function calcularDistancia(lat1, lng1, lat2, lng2) {
+        var R = 6371; // Raio da Terra em km
+        var dLat = toRad(lat2 - lat1);
+        var dLng = toRad(lng2 - lng1);
+        var a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        var d = R * c;
+        return d;
+    }
+
+    function toRad(Value) {
+        return Value * Math.PI / 180;
     }
     </script>
 </body>
