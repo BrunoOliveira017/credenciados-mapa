@@ -1,99 +1,109 @@
-<div style="padding: 20px;">
-  <!-- Campo de Entrada para Pesquisa de Cidades -->
-  <input type="text" id="cidadeInput" placeholder="Digite o nome da cidade" style="width: 300px; padding: 5px; margin-bottom: 10px;"/>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesquisa de Cidades</title>
+</head>
+<body>
+    <div style="padding: 20px;">
+        <!-- Campo de Entrada para Pesquisa de Cidades -->
+        <input type="text" id="cidadeInput" placeholder="Digite o nome da cidade" style="width: 300px; padding: 5px; margin-bottom: 10px;"/>
 
-  <!-- Filtros Opcionais -->
-  <div style="margin-top: 10px;">
-    <label>
-      <input type="checkbox" id="oficinaMovelCheckbox"/> Oficina Móvel?
-    </label>
-  
-    <label style="margin-left: 20px;">
-      <input type="checkbox" id="jaPrestouServicoCheckbox"/> Já Prestou Serviço?
-    </label>
-  </div>
+        <!-- Filtros Opcionais -->
+        <div style="margin-top: 10px;">
+            <label>
+                <input type="checkbox" id="oficinaMovelCheckbox"/> Oficina Móvel?
+            </label>
+        
+            <label style="margin-left: 20px;">
+                <input type="checkbox" id="jaPrestouServicoCheckbox"/> Já Prestou Serviço?
+            </label>
+        </div>
 
-  <!-- Botão de Pesquisa -->
-  <button style="margin-top: 20px;" onclick="pesquisarCidade()">Pesquisar</button>
+        <!-- Botão de Pesquisa -->
+        <button style="margin-top: 20px;" onclick="pesquisarCidade()">Pesquisar</button>
 
-  <!-- Exibição do Resultado -->
-  <div id="resultado" style="margin-top: 20px; font-weight: bold;"></div>
-</div>
+        <!-- Exibição do Resultado -->
+        <div id="resultado" style="margin-top: 20px; font-weight: bold;"></div>
+    </div>
 
-<script>
-function pesquisarCidade() {
-  var cidadePesquisada = document.getElementById('cidadeInput').value;
-  var oficinaMovel = document.getElementById('oficinaMovelCheckbox').checked;
-  var jaPrestouServico = document.getElementById('jaPrestouServicoCheckbox').checked;
+    <script>
+    function pesquisarCidade() {
+        var cidadePesquisada = document.getElementById('cidadeInput').value;
+        var oficinaMovel = document.getElementById('oficinaMovelCheckbox').checked;
+        var jaPrestouServico = document.getElementById('jaPrestouServicoCheckbox').checked;
 
-  // Verifica se o campo de pesquisa está vazio
-  if (!cidadePesquisada) {
-    document.getElementById('resultado').innerText = "Por favor, insira o nome de uma cidade.";
-    return;
-  }
+        // Verifica se o campo de pesquisa está vazio
+        if (!cidadePesquisada) {
+            document.getElementById('resultado').innerText = "Por favor, insira o nome de uma cidade.";
+            return;
+        }
 
-  // Obtém as coordenadas da cidade pesquisada
-  obterCoordenadasCidade(cidadePesquisada, function(cidadePesquisadaLat, cidadePesquisadaLng) {
-    // Verifica se as coordenadas foram obtidas com sucesso
-    if (cidadePesquisadaLat == null || cidadePesquisadaLng == null) {
-      document.getElementById('resultado').innerText = "Cidade não encontrada. Tente novamente.";
-      return;
+        // Obtém as coordenadas da cidade pesquisada
+        obterCoordenadasCidade(cidadePesquisada, function(cidadePesquisadaLat, cidadePesquisadaLng) {
+            // Verifica se as coordenadas foram obtidas com sucesso
+            if (cidadePesquisadaLat == null || cidadePesquisadaLng == null) {
+                document.getElementById('resultado').innerText = "Cidade não encontrada. Tente novamente.";
+                return;
+            }
+
+            // Monta a consulta SQL para encontrar a cidade mais próxima no banco de dados
+            var query = `
+                SELECT City_Name, 
+                (6371 * acos(cos(radians(${cidadePesquisadaLat})) 
+                * cos(radians(City_Lat)) 
+                * cos(radians(City_Lng) - radians(${cidadePesquisadaLng})) 
+                + sin(radians(${cidadePesquisadaLat})) 
+                * sin(radians(City_Lat)))) AS distance 
+                FROM Cities 
+                WHERE 1=1`;
+
+            // Aplica o filtro "Oficina Móvel?" se selecionado
+            if (oficinaMovel) {
+                query += " AND \`oficina movel?\` = true";
+            }
+
+            // Aplica o filtro "Já Prestou Serviço?" se selecionado
+            if (jaPrestouServico) {
+                query += " AND \`Já prestou serviço?\` = true";
+            }
+
+            // Ordena pelo menor valor de distância e limita o resultado a 1 cidade
+            query += " ORDER BY distance ASC LIMIT 1";
+
+            // Executa a consulta SQL no Zoho Analytics
+            zohoAnalytics.executeSQL(query, function(response) {
+                if (response && response.length > 0) {
+                    var cidadeMaisProxima = response[0]["City_Name"];
+                    var distancia = response[0]["distance"].toFixed(2);
+                    document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${distancia} km.`;
+                } else {
+                    document.getElementById('resultado').innerText = "Nenhuma cidade encontrada próxima.";
+                }
+            });
+        });
     }
 
-    // Monta a consulta SQL para encontrar a cidade mais próxima no banco de dados
-    var query = `
-      SELECT City_Name, 
-      (6371 * acos(cos(radians(${cidadePesquisadaLat})) 
-      * cos(radians(City_Lat)) 
-      * cos(radians(City_Lng) - radians(${cidadePesquisadaLng})) 
-      + sin(radians(${cidadePesquisadaLat})) 
-      * sin(radians(City_Lat)))) AS distance 
-      FROM Cities 
-      WHERE 1=1`;
+    // Função para obter as coordenadas da cidade usando a API Nominatim
+    function obterCoordenadasCidade(nomeCidade, callback) {
+        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeCidade)}&format=json&limit=1`;
 
-    // Aplica o filtro "Oficina Móvel?" se selecionado
-    if (oficinaMovel) {
-      query += " AND `oficina movel?` = true";
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    var location = data[0];
+                    callback(location.lat, location.lon);
+                } else {
+                    callback(null, null);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao obter coordenadas:', error);
+                callback(null, null);
+            });
     }
-
-    // Aplica o filtro "Já Prestou Serviço?" se selecionado
-    if (jaPrestouServico) {
-      query += " AND `Já prestou serviço?` = true";
-    }
-
-    // Ordena pelo menor valor de distância e limita o resultado a 1 cidade
-    query += " ORDER BY distance ASC LIMIT 1";
-
-    // Executa a consulta SQL no Zoho Analytics
-    zohoAnalytics.executeSQL(query, function(response) {
-      if (response && response.length > 0) {
-        var cidadeMaisProxima = response[0]["City_Name"];
-        var distancia = response[0]["distance"].toFixed(2);
-        document.getElementById('resultado').innerText = `Cidade mais próxima: ${cidadeMaisProxima}, Distância: ${distancia} km.`;
-      } else {
-        document.getElementById('resultado').innerText = "Nenhuma cidade encontrada próxima.";
-      }
-    });
-  });
-}
-
-// Função para obter as coordenadas da cidade usando a API Nominatim
-function obterCoordenadasCidade(nomeCidade, callback) {
-  var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeCidade)}&format=json&limit=1`;
-
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      if (data && data.length > 0) {
-        var location = data[0];
-        callback(location.lat, location.lon);
-      } else {
-        callback(null, null);
-      }
-    })
-    .catch(error => {
-      console.error('Erro ao obter coordenadas:', error);
-      callback(null, null);
-    });
-}
-</script>
+    </script>
+</body>
+</html>
