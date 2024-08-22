@@ -59,7 +59,7 @@
             return;
         }
 
-        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=5&city=1&extratags=1`;
+        var url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=5&extratags=1`;
 
         fetch(url)
             .then(response => response.json())
@@ -68,16 +68,14 @@
                 sugestoesDiv.innerHTML = '';
 
                 data.forEach(item => {
-                    if (item.type === 'city' || item.type === 'town' || item.type === 'village') {
-                        var cidadeNome = item.display_name;
-                        var div = document.createElement('div');
-                        div.textContent = cidadeNome;
-                        div.onclick = function() {
-                            document.getElementById('cidadeInput').value = cidadeNome;
-                            sugestoesDiv.innerHTML = '';
-                        };
-                        sugestoesDiv.appendChild(div);
-                    }
+                    var cidadeNome = item.display_name;
+                    var div = document.createElement('div');
+                    div.textContent = cidadeNome;
+                    div.onclick = function() {
+                        document.getElementById('cidadeInput').value = cidadeNome;
+                        sugestoesDiv.innerHTML = '';
+                    };
+                    sugestoesDiv.appendChild(div);
                 });
             })
             .catch(error => console.error('Erro ao sugerir cidades:', error));
@@ -158,11 +156,8 @@
             .then(data => {
                 if (data && data.length > 0) {
                     var location = data[0];
-                    if (location.type === 'city' || location.type === 'town' || location.type === 'village') {
-                        callback(location.lat, location.lon);
-                    } else {
-                        callback(null, null);
-                    }
+                    // Removido o filtro de tipo para testar
+                    callback(location.lat, location.lon);
                 } else {
                     callback(null, null);
                 }
